@@ -1,73 +1,61 @@
-# preprocess.py
-
-import PyPDF2
-import openai
-import faiss
-import numpy as np
-import pickle
 import os
-
-# OpenAI API 키 설정
-openai.api_key = 'YOUR_OPENAI_API_KEY'
-
-# PDF에서 텍스트 추출 함수
-def extract_text_from_pdf(pdf_path):
-    with open(pdf_path, 'rb') as f:
-        reader = PyPDF2.PdfReader(f)
-        text = ''
-        for page in reader.pages:
-            text += page.extract_text()
-    return text
-
-# 텍스트 전처리 함수
-def preprocess_text(text):
-    # 필요에 따라 전처리 로직 추가
-    return text
-
-# 임베딩 생성 함수
-def get_text_embedding(text):
-    response = openai.Embedding.create(
-        input=[text],
-        model="text-embedding-ada-002"
-    )
-    embeddings = response['data'][0]['embedding']
-    return embeddings
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
 
 def main():
-    # PDF 파일이 저장된 디렉토리 경로
-    pdf_dir = './pdf_files'
+    # PDF 파일이 있는 폴더 경로
+    pdf_folder = "./pdfs"
 
-    # 모든 문서의 텍스트와 임베딩을 저장할 리스트
-    all_texts = []
-    all_embeddings = []
+    # 모든 PDF 파일에서 텍스트 추출
+    documents = []
+    for file in os.listdir(pdf_folder):
+        if file.endswith(".pdf"):
+            file_path = os.path.join(pdf_folder, file)
+            print(f"Processing file: {file_path}")
+            try:
+                loader = PyPDFLoader(file_path)
+                documents.extend(loader.load())
+                print(f"Successfully loaded {file}")
+            except Exception as e:
+                print(f"Error loading {file}: {str(e)}")
 
-    # PDF 디렉토리 내의 모든 파일 처리
-    for filename in os.listdir(pdf_dir):
-        if filename.endswith('.pdf'):
-            pdf_path = os.path.join(pdf_dir, filename)
-            print(f"{filename} 처리 중...")
-            text = extract_text_from_pdf(pdf_path)
-            text = preprocess_text(text)
-            embeddings = get_text_embedding(text)
+    if not documents:
+        print("No documents were successfully loaded. Please check your PDF files and permissions.")
+        return
 
-            all_texts.append(text)
-            all_embeddings.append(embeddings)
+    print(f"Total documents loaded: {len(documents)}")
 
-    # 임베딩을 numpy 배열로 변환
-    all_embeddings = np.array(all_embeddings).astype('float32')
+    # 텍스트 분할
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    texts = text_splitter.split_documents(documents)
 
-    # 벡터 스토어 구축
-    dimension = all_embeddings.shape[1]
-    index = faiss.IndexFlatL2(dimension)
-    index.add(all_embeddings)
+    print(f"Total text chunks after splitting: {len(texts)}")
 
-    # 임베딩, 텍스트, 인덱스를 저장
-    with open('texts.pkl', 'wb') as f:
-        pickle.dump(all_texts, f)
+    if not texts:
+        print("No text chunks were created. Please check if the PDFs contain extractable text.")
+        return
 
-    faiss.write_index(index, 'vector_index.index')
+    # 임베딩 모델 초기화
+    embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    model_kwargs={'device': 'cpu'}
+)
 
-    print("사전 처리가 완료되었습니다.")
+    # FAISS 벡터 저장소 생성
+    try:
+        vector_store = FAISS.from_documents(texts, embeddings)
+        print("Successfully created FAISS index")
+    except Exception as e:
+        print(f"Error creating FAISS index: {str(e)}")
+        return
+
+    # 벡터 저장소 저장
+    vector_store.save_local("faiss_index")
+
+    print("전처리 완료: FAISS 인덱스가 생성되었습니다.")
 
 if __name__ == "__main__":
     main()
+    
