@@ -3,4 +3,3 @@ matplotlib
 openai
 langchain_community
 langchain
-os
