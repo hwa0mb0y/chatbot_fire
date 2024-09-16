@@ -1,7 +1,6 @@
 streamlit
 matplotlib
 openai
-warnings
 langchain_community
 langchain
 os
