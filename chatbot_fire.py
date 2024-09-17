@@ -11,8 +11,8 @@ warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # 페이지 설정
-st.set_page_config(page_title="전문 분야 챗봇", page_icon="🤖")
-st.title("전문 분야 챗봇")
+st.set_page_config(page_title="화학 물질 화재 사고 전문 챗봇", page_icon="🤖")
+st.title("화학 물질 화재 사고 전문 챗봇")
 
 # OpenAI API 키 설정
 openai_api_key = st.sidebar.text_input("OpenAI API 키를 입력하세요", type="password")
